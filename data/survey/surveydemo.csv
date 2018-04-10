@@ -1,0 +1,415 @@
+"servper","ntype","rtype","n"
+"2000Q2","achieved","dwellings",1688
+"2000Q3","achieved","dwellings",1635
+"2000Q4","achieved","dwellings",1623
+"2001Q1","achieved","dwellings",1579
+"2001Q3","achieved","dwellings",1561
+"2001Q4","achieved","dwellings",1572
+"2002Q1","achieved","dwellings",1547
+"2002Q2","achieved","dwellings",1487
+"2002Q3","achieved","dwellings",1443
+"2002Q4","achieved","dwellings",1344
+"2003Q1","achieved","dwellings",1292
+"2003Q2","achieved","dwellings",1277
+"2003Q3","achieved","dwellings",1168
+"2003Q4","achieved","dwellings",1129
+"2004Q1","achieved","dwellings",1096
+"2004Q2","achieved","dwellings",1041
+"2004Q3","achieved","dwellings",1001
+"2004Q4","achieved","dwellings",971
+"2005Q1","achieved","dwellings",959
+"2005Q2","achieved","dwellings",924
+"2005Q3","achieved","dwellings",884
+"2005Q4","achieved","dwellings",868
+"2006Q1","achieved","dwellings",864
+"2006Q2","achieved","dwellings",1363
+"2006Q3","achieved","dwellings",1442
+"2006Q4","achieved","dwellings",1525
+"2007Q1","achieved","dwellings",1598
+"2007Q2","achieved","dwellings",1686
+"2007Q3","achieved","dwellings",1740
+"2007Q4","achieved","dwellings",1861
+"2008Q1","achieved","dwellings",1950
+"2008Q2","achieved","dwellings",1958
+"2008Q3","achieved","dwellings",1997
+"2008Q4","achieved","dwellings",2081
+"2009Q1","achieved","dwellings",2074
+"2009Q2","achieved","dwellings",2130
+"2009Q3","achieved","dwellings",2134
+"2009Q4","achieved","dwellings",2214
+"2010Q1","achieved","dwellings",2250
+"2010Q2","achieved","dwellings",2306
+"2010Q3","achieved","dwellings",2312
+"2010Q4","achieved","dwellings",2344
+"2011Q1","achieved","dwellings",2343
+"2011Q2","achieved","dwellings",2419
+"2011Q3","achieved","dwellings",2404
+"2011Q4","achieved","dwellings",2399
+"2012Q1","achieved","dwellings",2429
+"2012Q3","achieved","dwellings",2397
+"2012Q4","achieved","dwellings",2480
+"2013Q1","achieved","dwellings",2407
+"2013Q2","achieved","dwellings",2471
+"2013Q3","achieved","dwellings",2512
+"2013Q4","achieved","dwellings",2426
+"2014Q1","achieved","dwellings",2433
+"2014Q2","achieved","dwellings",2448
+"2014Q3","achieved","dwellings",2429
+"2014Q4","achieved","dwellings",2413
+"2015Q1","achieved","dwellings",2469
+"2015Q2","achieved","dwellings",2492
+"2015Q3","achieved","dwellings",2464
+"2015Q4","achieved","dwellings",2406
+"2016Q1","achieved","dwellings",2468
+"2016Q2","achieved","dwellings",2582
+"2016Q3","achieved","dwellings",2473
+"2016Q4","achieved","dwellings",2386
+"2017Q1","achieved","dwellings",2414
+"2017Q2","achieved","dwellings",2433
+"2017Q3","achieved","dwellings",2445
+"2017Q4","achieved","dwellings",2429
+"2000Q2","achieved","landlords",1095
+"2000Q3","achieved","landlords",1064
+"2000Q4","achieved","landlords",1048
+"2001Q1","achieved","landlords",1014
+"2001Q3","achieved","landlords",998
+"2001Q4","achieved","landlords",986
+"2002Q1","achieved","landlords",1003
+"2002Q2","achieved","landlords",915
+"2002Q3","achieved","landlords",893
+"2002Q4","achieved","landlords",840
+"2003Q1","achieved","landlords",813
+"2003Q2","achieved","landlords",807
+"2003Q3","achieved","landlords",739
+"2003Q4","achieved","landlords",704
+"2004Q1","achieved","landlords",679
+"2004Q2","achieved","landlords",646
+"2004Q3","achieved","landlords",621
+"2004Q4","achieved","landlords",603
+"2005Q1","achieved","landlords",589
+"2005Q2","achieved","landlords",563
+"2005Q3","achieved","landlords",535
+"2005Q4","achieved","landlords",515
+"2006Q1","achieved","landlords",513
+"2006Q2","achieved","landlords",742
+"2006Q3","achieved","landlords",801
+"2006Q4","achieved","landlords",836
+"2007Q1","achieved","landlords",867
+"2007Q2","achieved","landlords",902
+"2007Q3","achieved","landlords",920
+"2007Q4","achieved","landlords",967
+"2008Q1","achieved","landlords",980
+"2008Q2","achieved","landlords",997
+"2008Q3","achieved","landlords",1025
+"2008Q4","achieved","landlords",1053
+"2009Q1","achieved","landlords",1040
+"2009Q2","achieved","landlords",1069
+"2009Q3","achieved","landlords",1069
+"2009Q4","achieved","landlords",1088
+"2010Q1","achieved","landlords",1114
+"2010Q2","achieved","landlords",1126
+"2010Q3","achieved","landlords",1115
+"2010Q4","achieved","landlords",1124
+"2011Q1","achieved","landlords",1109
+"2011Q2","achieved","landlords",1143
+"2011Q3","achieved","landlords",1134
+"2011Q4","achieved","landlords",1113
+"2012Q1","achieved","landlords",1138
+"2012Q3","achieved","landlords",1133
+"2012Q4","achieved","landlords",1146
+"2013Q1","achieved","landlords",1156
+"2013Q2","achieved","landlords",1174
+"2013Q3","achieved","landlords",1198
+"2013Q4","achieved","landlords",1168
+"2014Q1","achieved","landlords",1165
+"2014Q2","achieved","landlords",1163
+"2014Q3","achieved","landlords",1169
+"2014Q4","achieved","landlords",1170
+"2015Q1","achieved","landlords",1197
+"2015Q2","achieved","landlords",1212
+"2015Q3","achieved","landlords",1195
+"2015Q4","achieved","landlords",1192
+"2016Q1","achieved","landlords",1202
+"2016Q2","achieved","landlords",1195
+"2016Q3","achieved","landlords",1185
+"2016Q4","achieved","landlords",1158
+"2017Q1","achieved","landlords",1165
+"2017Q2","achieved","landlords",1165
+"2017Q3","achieved","landlords",1179
+"2017Q4","achieved","landlords",1170
+"2000Q2","target","dwellings",1897
+"2000Q3","target","dwellings",1894
+"2000Q4","target","dwellings",1855
+"2001Q1","target","dwellings",1748
+"2001Q3","target","dwellings",1795
+"2001Q4","target","dwellings",1848
+"2002Q1","target","dwellings",1802
+"2002Q2","target","dwellings",1701
+"2002Q3","target","dwellings",1614
+"2002Q4","target","dwellings",1552
+"2003Q1","target","dwellings",1484
+"2003Q2","target","dwellings",1399
+"2003Q3","target","dwellings",1365
+"2003Q4","target","dwellings",1338
+"2004Q1","target","dwellings",1287
+"2004Q2","target","dwellings",1274
+"2004Q3","target","dwellings",1210
+"2004Q4","target","dwellings",1155
+"2005Q1","target","dwellings",1118
+"2005Q2","target","dwellings",1077
+"2005Q3","target","dwellings",1033
+"2005Q4","target","dwellings",1011
+"2006Q1","target","dwellings",984
+"2006Q2","target","dwellings",1486
+"2006Q3","target","dwellings",1591
+"2006Q4","target","dwellings",1717
+"2007Q1","target","dwellings",1838
+"2007Q2","target","dwellings",1968
+"2007Q3","target","dwellings",2045
+"2007Q4","target","dwellings",2160
+"2008Q1","target","dwellings",2259
+"2008Q2","target","dwellings",2221
+"2008Q3","target","dwellings",2247
+"2008Q4","target","dwellings",2321
+"2009Q1","target","dwellings",2390
+"2009Q2","target","dwellings",2425
+"2009Q3","target","dwellings",2463
+"2009Q4","target","dwellings",2548
+"2010Q1","target","dwellings",2577
+"2010Q2","target","dwellings",2560
+"2010Q3","target","dwellings",2579
+"2010Q4","target","dwellings",2612
+"2011Q1","target","dwellings",2669
+"2011Q2","target","dwellings",2765
+"2011Q3","target","dwellings",2754
+"2011Q4","target","dwellings",2755
+"2012Q1","target","dwellings",2780
+"2012Q3","target","dwellings",2756
+"2012Q4","target","dwellings",2831
+"2013Q1","target","dwellings",2833
+"2013Q2","target","dwellings",2889
+"2013Q3","target","dwellings",2935
+"2013Q4","target","dwellings",2881
+"2014Q1","target","dwellings",2855
+"2014Q2","target","dwellings",2883
+"2014Q3","target","dwellings",2875
+"2014Q4","target","dwellings",2864
+"2015Q1","target","dwellings",2847
+"2015Q2","target","dwellings",2903
+"2015Q3","target","dwellings",2913
+"2015Q4","target","dwellings",2896
+"2016Q1","target","dwellings",2943
+"2016Q2","target","dwellings",3055
+"2016Q3","target","dwellings",2955
+"2016Q4","target","dwellings",2881
+"2017Q1","target","dwellings",2928
+"2017Q2","target","dwellings",2931
+"2017Q3","target","dwellings",2916
+"2017Q4","target","dwellings",2940
+"2000Q2","target","landlords",1252
+"2000Q3","target","landlords",1233
+"2000Q4","target","landlords",1205
+"2001Q1","target","landlords",1128
+"2001Q3","target","landlords",1150
+"2001Q4","target","landlords",1176
+"2002Q1","target","landlords",1138
+"2002Q2","target","landlords",1077
+"2002Q3","target","landlords",1024
+"2002Q4","target","landlords",988
+"2003Q1","target","landlords",944
+"2003Q2","target","landlords",884
+"2003Q3","target","landlords",858
+"2003Q4","target","landlords",843
+"2004Q1","target","landlords",805
+"2004Q2","target","landlords",796
+"2004Q3","target","landlords",757
+"2004Q4","target","landlords",718
+"2005Q1","target","landlords",693
+"2005Q2","target","landlords",661
+"2005Q3","target","landlords",638
+"2005Q4","target","landlords",619
+"2006Q1","target","landlords",599
+"2006Q2","target","landlords",826
+"2006Q3","target","landlords",889
+"2006Q4","target","landlords",947
+"2007Q1","target","landlords",995
+"2007Q2","target","landlords",1048
+"2007Q3","target","landlords",1077
+"2007Q4","target","landlords",1121
+"2008Q1","target","landlords",1129
+"2008Q2","target","landlords",1121
+"2008Q3","target","landlords",1147
+"2008Q4","target","landlords",1165
+"2009Q1","target","landlords",1191
+"2009Q2","target","landlords",1210
+"2009Q3","target","landlords",1225
+"2009Q4","target","landlords",1252
+"2010Q1","target","landlords",1262
+"2010Q2","target","landlords",1242
+"2010Q3","target","landlords",1258
+"2010Q4","target","landlords",1267
+"2011Q1","target","landlords",1263
+"2011Q2","target","landlords",1294
+"2011Q3","target","landlords",1294
+"2011Q4","target","landlords",1298
+"2012Q1","target","landlords",1315
+"2012Q3","target","landlords",1309
+"2012Q4","target","landlords",1315
+"2013Q1","target","landlords",1324
+"2013Q2","target","landlords",1346
+"2013Q3","target","landlords",1357
+"2013Q4","target","landlords",1354
+"2014Q1","target","landlords",1346
+"2014Q2","target","landlords",1358
+"2014Q3","target","landlords",1363
+"2014Q4","target","landlords",1367
+"2015Q1","target","landlords",1353
+"2015Q2","target","landlords",1377
+"2015Q3","target","landlords",1391
+"2015Q4","target","landlords",1388
+"2016Q1","target","landlords",1393
+"2016Q2","target","landlords",1393
+"2016Q3","target","landlords",1389
+"2016Q4","target","landlords",1385
+"2017Q1","target","landlords",1387
+"2017Q2","target","landlords",1396
+"2017Q3","target","landlords",1388
+"2017Q4","target","landlords",1378
+"2000Q2","with price change","dwellings",294
+"2000Q3","with price change","dwellings",297
+"2000Q4","with price change","dwellings",259
+"2001Q1","with price change","dwellings",300
+"2001Q3","with price change","dwellings",266
+"2001Q4","with price change","dwellings",261
+"2002Q1","with price change","dwellings",303
+"2002Q2","with price change","dwellings",307
+"2002Q3","with price change","dwellings",278
+"2002Q4","with price change","dwellings",266
+"2003Q1","with price change","dwellings",258
+"2003Q2","with price change","dwellings",223
+"2003Q3","with price change","dwellings",228
+"2003Q4","with price change","dwellings",214
+"2004Q1","with price change","dwellings",220
+"2004Q2","with price change","dwellings",201
+"2004Q3","with price change","dwellings",213
+"2004Q4","with price change","dwellings",202
+"2005Q1","with price change","dwellings",189
+"2005Q2","with price change","dwellings",200
+"2005Q3","with price change","dwellings",209
+"2005Q4","with price change","dwellings",169
+"2006Q1","with price change","dwellings",166
+"2006Q2","with price change","dwellings",170
+"2006Q3","with price change","dwellings",254
+"2006Q4","with price change","dwellings",263
+"2007Q1","with price change","dwellings",297
+"2007Q2","with price change","dwellings",292
+"2007Q3","with price change","dwellings",366
+"2007Q4","with price change","dwellings",302
+"2008Q1","with price change","dwellings",441
+"2008Q2","with price change","dwellings",352
+"2008Q3","with price change","dwellings",384
+"2008Q4","with price change","dwellings",367
+"2009Q1","with price change","dwellings",411
+"2009Q2","with price change","dwellings",318
+"2009Q3","with price change","dwellings",366
+"2009Q4","with price change","dwellings",323
+"2010Q1","with price change","dwellings",425
+"2010Q2","with price change","dwellings",389
+"2010Q3","with price change","dwellings",406
+"2010Q4","with price change","dwellings",401
+"2011Q1","with price change","dwellings",422
+"2011Q2","with price change","dwellings",416
+"2011Q3","with price change","dwellings",442
+"2011Q4","with price change","dwellings",354
+"2012Q1","with price change","dwellings",466
+"2012Q3","with price change","dwellings",423
+"2012Q4","with price change","dwellings",371
+"2013Q1","with price change","dwellings",453
+"2013Q2","with price change","dwellings",429
+"2013Q3","with price change","dwellings",443
+"2013Q4","with price change","dwellings",389
+"2014Q1","with price change","dwellings",425
+"2014Q2","with price change","dwellings",393
+"2014Q3","with price change","dwellings",464
+"2014Q4","with price change","dwellings",391
+"2015Q1","with price change","dwellings",465
+"2015Q2","with price change","dwellings",485
+"2015Q3","with price change","dwellings",454
+"2015Q4","with price change","dwellings",393
+"2016Q1","with price change","dwellings",418
+"2016Q2","with price change","dwellings",444
+"2016Q3","with price change","dwellings",491
+"2016Q4","with price change","dwellings",337
+"2017Q1","with price change","dwellings",444
+"2017Q2","with price change","dwellings",486
+"2017Q3","with price change","dwellings",453
+"2017Q4","with price change","dwellings",393
+"2000Q2","with price change","landlords",238
+"2000Q3","with price change","landlords",241
+"2000Q4","with price change","landlords",225
+"2001Q1","with price change","landlords",249
+"2001Q3","with price change","landlords",223
+"2001Q4","with price change","landlords",191
+"2002Q1","with price change","landlords",229
+"2002Q2","with price change","landlords",213
+"2002Q3","with price change","landlords",221
+"2002Q4","with price change","landlords",199
+"2003Q1","with price change","landlords",203
+"2003Q2","with price change","landlords",181
+"2003Q3","with price change","landlords",178
+"2003Q4","with price change","landlords",173
+"2004Q1","with price change","landlords",166
+"2004Q2","with price change","landlords",157
+"2004Q3","with price change","landlords",136
+"2004Q4","with price change","landlords",145
+"2005Q1","with price change","landlords",122
+"2005Q2","with price change","landlords",145
+"2005Q3","with price change","landlords",122
+"2005Q4","with price change","landlords",93
+"2006Q1","with price change","landlords",117
+"2006Q2","with price change","landlords",101
+"2006Q3","with price change","landlords",138
+"2006Q4","with price change","landlords",190
+"2007Q1","with price change","landlords",219
+"2007Q2","with price change","landlords",213
+"2007Q3","with price change","landlords",243
+"2007Q4","with price change","landlords",219
+"2008Q1","with price change","landlords",301
+"2008Q2","with price change","landlords",238
+"2008Q3","with price change","landlords",256
+"2008Q4","with price change","landlords",257
+"2009Q1","with price change","landlords",294
+"2009Q2","with price change","landlords",248
+"2009Q3","with price change","landlords",260
+"2009Q4","with price change","landlords",252
+"2010Q1","with price change","landlords",296
+"2010Q2","with price change","landlords",284
+"2010Q3","with price change","landlords",246
+"2010Q4","with price change","landlords",270
+"2011Q1","with price change","landlords",309
+"2011Q2","with price change","landlords",276
+"2011Q3","with price change","landlords",261
+"2011Q4","with price change","landlords",255
+"2012Q1","with price change","landlords",303
+"2012Q3","with price change","landlords",285
+"2012Q4","with price change","landlords",265
+"2013Q1","with price change","landlords",314
+"2013Q2","with price change","landlords",297
+"2013Q3","with price change","landlords",278
+"2013Q4","with price change","landlords",272
+"2014Q1","with price change","landlords",296
+"2014Q2","with price change","landlords",300
+"2014Q3","with price change","landlords",290
+"2014Q4","with price change","landlords",274
+"2015Q1","with price change","landlords",305
+"2015Q2","with price change","landlords",339
+"2015Q3","with price change","landlords",301
+"2015Q4","with price change","landlords",277
+"2016Q1","with price change","landlords",321
+"2016Q2","with price change","landlords",328
+"2016Q3","with price change","landlords",297
+"2016Q4","with price change","landlords",248
+"2017Q1","with price change","landlords",302
+"2017Q2","with price change","landlords",326
+"2017Q3","with price change","landlords",295
+"2017Q4","with price change","landlords",280
