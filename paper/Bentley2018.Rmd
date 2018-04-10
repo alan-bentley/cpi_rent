@@ -1,0 +1,1140 @@
+---
+title: '**Rentals for housing:** A model-based estimator of inflation from administrative data'
+author: "Alan Bentley^[alan.bentley@stats.govt.nz]"
+date: "Senior Analyst, Stats NZ and Ministry of Business, Innovation & Employment^[[Crown copyright.](https://www.stats.govt.nz/about-us/copyright/?url=/about_us/about-this-site/copyright-terms-of-use.aspx) Content is licensed under [Creative Commons Attribution 4.0 International.](https://creativecommons.org/licenses/by/4.0/) You are free to copy, distribute, and adapt, as long as you attribute the work to Stats NZ and Ministry of Business, Innovation & Employment. The opinions, findings, recommendations, and conclusions expressed in this paper are those of the author. Source code for this paper and data behind the charts can be found at https://github.com/alan-bentley/cpi_rent]"
+output:
+  pdf_document: null
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+  word_document:
+    toc: yes
+subtitle: Paper presented at the Meeting of the Group of Experts on Consumer Price
+  Indices, Geneva, Switzerland, May 2018
+fontsize: 11pt
+urlcolor: blue
+linkcolor: black
+header-includes:
+- \usepackage{caption}
+- \captionsetup[figure]{labelformat=empty}
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, message=F, warning=F, cache=T)
+
+#Load some libraries
+# library(mbie) #For MBIE colours
+library(tidyr) #For data manipulation
+library(ggplot2) #For charts
+library(scales) #For chart labels
+library(dplyr) #For data manipulation
+library(zoo) #For dates (dealing with quarters)
+
+#Custom ggplot (chart) theme
+theme_ab <- function(base_size = 10){
+  theme_minimal(base_size = base_size) %+replace%
+    theme(plot.title = element_text(size=12),
+          axis.text = element_text(size=10),
+          strip.background = element_rect(fill="black"), 
+          strip.text = element_text (color="white", size=10, margin = margin(0,.5,0,.5, "cm")))
+}
+
+#Some Stats NZ colours
+pal1 <- c("#ec6607","#706f6e","#51ae32","#6f2282","#0378bd")
+mbie.cols <- c("#006272", "#97D700", "#00B5E2", "#753BBD", "#DF1995", "#FF6900", "#FBE122")
+
+# root <- "//wd.govt.nz/dfs/SharedData/Wellington/Bowen Street/R&N/Networks/Housing Information & Modelling/housing_projects/cpi_rent/ILO_UNECE_meeting/data/"
+root <- "https://raw.githubusercontent.com/alan-bentley/cpi_rent/master/data"
+
+```
+
+***
+
+# Abstract
+
+This paper presents research on enhancements to the estimation of CPI rent price inflation in New Zealand. Two aspects are explored: 
+
+*	Using government administrative data to replace the need for a sample survey
+*	A multilateral model to improve estimates of 'pure price' inflation
+
+Both survey and administrative datasets provide a longitudinal panel of dwellings, dynamically updated to reflect market changes. This type of data is well suited to fixed-effects regression models to estimate changes in the price of rent, controlling for changing dwelling quality. We empirically explore the sensitivity of these models to data window length and index-chain alignment. Using the findings from length-alignment simulations and product life-cycle diagnostics we suggest a suitable window length and splice method to generate estimates in real-time, as additional data becomes available, with and without a 'no revision' constraint.
+
+```
+
+
+
+
+
+```
+```{r s0.1, fig.align="center", out.width=".2\\linewidth", out.height=".2\\linewidth",echo=FALSE}
+library(knitr)
+# include_graphics(paste0(root, "/Documentation/SNZlogo1.png"))
+```
+```
+
+
+```
+```{r s0.2, fig.align="center", out.width=".3\\linewidth", out.height=".3\\linewidth",echo=FALSE}
+# include_graphics(paste0(root, "/Documentation/mbie-logo.png"))
+```
+
+\newpage
+
+# Introduction
+
+For more than two decades New Zealand has had two official sources of rent price statistics (Figure 1); a survey of landlords run by Stats NZ, and administrative rent data held by the Ministry of Business, Innovation and Employment (MBIE).[^1] The survey is used to produce a quality-adjusted price index; the 'actual rental for housing' component of the Consumers Price Index (CPI) and Household Living-costs Price Indexes (HLPIs). The administrative data -- generated as a by-product of regulations to lodge tenancy bonds (deposits) with MBIE's Tenancy Services -- generates average rent prices which can be disaggregated to much finer regional breakdowns and split to lower temporal frequency (monthly, rather than quarterly).
+
+[^1]: Formerly held by the then Department of Building and Housing.
+
+### Figure 1
+
+```{r s1, fig.height=4}
+
+#1.1 Read the data from MBIE
+bond_geomean <- read.csv(url("http://www.mbie.govt.nz/info-services/housing-property/sector-information-and-statistics/rental-bond-data/detailed/detailed-geo-mean-rents.csv")) %>%
+  subset(Property_Type=="Property Type Total" & Bedrooms=="Bedrooms Total" & SAU=="National Total") %>%
+  select(-Property_Type,-Bedrooms,-SAU) %>%
+  gather(period,geomean) %>%
+  mutate(period=as.Date(gsub("X","", period), "%Y.%m.%d"),
+         quarter = as.yearqtr(period),
+         index=geomean/geomean[1],
+         change.a = index/lag(index,4)-1,
+         series="Geometric mean, administrative data") %>%
+  filter(quarter >= "2002 Q1") %>%
+  mutate(index=index/index[1]) %>%
+  select(-period,-geomean)
+
+#1.2 Read the data from Stats NZ
+# cpi_rent <- read.csv(url("http://archive.stats.govt.nz/~/media/BAE8BFA3B1D64455BD23B64C536B809B.ashx")) %>%
+#             subset(Level=="Class" & Description=="Actual rentals for housing") %>%
+#             select(Quarter,Index.number) %>%
+#             mutate(quarter = as.yearqtr(Quarter)) %>%
+#             select(-Quarter) %>%
+#             mutate(index=Index.number/1000,
+#                   change.a = index/lag(index,4)-1,
+#                   series="Quality-adjusted price index, survey data") %>%
+#             select(-Index.number)
+
+#Longer timeseries
+cpi <- read.csv(url(paste0(root,"/published/cpi_rent.csv")))
+
+cpi_rent2 <- cpi %>%
+   rename(index=NZ) %>%
+   mutate(quarter = as.yearqtr(period),
+         change.a = index/lag(index,4)-1,
+          series="Quality-adjusted price index, survey data") %>%
+   filter(as.yearqtr(period)>=as.yearqtr("2002 Q1")) %>%
+   mutate(index=index/index[1]) %>%
+   select(-period)
+
+#1.3 Combine
+both <- rbind(bond_geomean,cpi_rent2) %>%
+          mutate(Cumulative=index-1) %>%
+          select(-index) %>%
+         rename(Annual=change.a) %>%
+   gather(type,val,-c(quarter, series))
+
+#1.4 Plot
+meanPlot <- ggplot(both, aes(as.Date(quarter),val))+
+  geom_line(aes(colour=series, linetype=series))+
+  facet_wrap(~type, scales="free")+
+  labs(title="Why are these series so different? \n",
+       subtitle="Current rent price statistics, percent change",
+       x="",y="",
+       caption="Source: Stats NZ and MBIE")+
+  theme_ab()+
+  scale_colour_manual(values=c("#006272","#ec6607"),
+                      name="")+
+  theme(legend.position="bottom")+
+  scale_linetype_discrete(name="")+
+  scale_y_continuous(labels=percent)
+meanPlot
+
+```
+
+In this paper, we develop a new rent price inflation estimator using a multilateral model to control for changing composition and quality of rental dwellings. Applying the same model to both datasets, we find that differences in the timing of recorded price change, appear short-lived and result in only a small impact on cumulative inflation. Short-run differences look to reflect rental 'stock' *vis-a-vis* rental 'flow' price inflation, for the survey and administrate data respectively. We discuss which approach may be preferred from both conceptual and practical points of view.
+
+Following Bentley and Krsinich (2017), we investigate an expenditure-weighted fixed-effects regression, with dwelling specific controls. Sensitivity to design choices of data window length (temporal sample) and index-chain alignment are access empirically. We discover that the data window length used has a sizeable impact on the estimates of cumulative rent price inflation. Using statistics on the frequency of price observations, and on pragmatic grounds, we suggest a suitable window length for this data that aims to strike a balance between transitivity and characteristicity.  
+
+## Rent price inflation
+
+Rent (actual rentals for housing) is one of the most important components of the CPI & HLPIs. It is about 10 percent of the CPI by expenditure weight. For households who pay rent, the proportion of their expenditure on rent is typically 30-40 percent. Figure 2 shows the typical proportion of expenditure on rent by some household groups.[^2]
+
+[^2]: These are the HLPI group 'democratic' expenditure weights.
+
+### Figure 2
+
+```{r s2, fig.height=2}
+
+#2. HLPI rent expenditure weights
+
+#2.1 Read weights from web
+hlpi  <- read.csv(url("http://archive.stats.govt.nz/~/media/Statistics/browse-categories/economic-indicators/prices-indexes/hlpi-backgrd-paper-oct-16/hlpi_weights.csv"))
+hlpi$hlpi_name <- gsub("\\\\u0101","\u0101", hlpi$hlpi_name) #remove added escape
+
+#2.2 Select some household-groups
+hlpi_rent <- select(subset(hlpi, nzhec==4.1), hlpi_name, year, weight, exp_pw) %>%
+              subset(year=="2014" & hlpi_name %in% c("Superannuitant","All households",
+                                                                "Beneficiary", "Expenditure quintile 1 (low)")) %>%
+              mutate(weight=weight/100)
+
+#2.3 Control order of groups
+hlpi_rent$hlpi_name <- factor(hlpi_rent$hlpi_name, levels=c("Superannuitant",
+                                                              "Expenditure quintile 1 (low)",
+                                                              "Beneficiary",
+                                                              "All households"))
+#2.4 Do plot
+hlpi_rentPlot <- ggplot(hlpi_rent, aes(hlpi_name,weight)) +
+                  geom_bar(stat="identity") +
+                  scale_y_continuous(labels=percent)+
+                  coord_flip() +
+                  labs(title="Rent is a significant expenditure for some households \n",
+                       y="proportion of expenditure", x="",
+                       caption="Source: Stats NZ")+
+                  theme_ab()
+                  
+hlpi_rentPlot
+
+```
+
+Beyond their significance in aggregate price indexes, rent statistics are of considerable public, and public policy, interest.
+
+# Data generation
+
+## Administrative data: Tenancy Bonds, MBIE
+
+Landlords can ask tenants to pay a monetary bond as security when they move into a property. Landlords who charge a bond must lodge it with MBIE's Tenancy Services within 23 working days. The Bond lodgement form (which can be completed online or by post) includes a requirement to state the weekly rent payment. Other data captured includes the dwelling address, dwelling type (such as room, flat, house), and the number of bedrooms. A unique property ID is created as part of the administrative process.
+
+The dataset used for this analysis covers bonds lodged 1 Jan 1993 -- 31 Dec 2017; 100 quarters; 25 years. It contains 4.1 million price observations, for 1 million unique properties. An average of 7.5 (median of 6) price observations per property. Stats NZ (2015) explains the dataset further.[^3] 
+
+[^3]: Disaggregated statistics from this source are released monthly as Open Data (MBIE, 2018).  
+
+Bentley and Krsinich (2017) assessed the coverage of the Tenancy Bond data and concluded that the data appears reasonable compared with the New Zealand Census of Population and Dwellings. Miller, Suie & Bycroft (2018) found near identical distributions for weekly rent amount, number of bedrooms, and sector of landlord, using Census and Tenancy Bond data. They conclude "... we see good consistency between the tenancy bond variables and the census ... The concepts used in the tenancy bonds are consistent with the statistical standard used by the census for each of the housing variables. Levels of missing data for tenancy bond variables are low, and comparable with the census levels of missing data."
+
+## Survey data: Quarterly survey of landlords, Stats NZ
+
+Current data collection for the CPI is a longitudinal postal survey of landlords, run continuously since 1998 Q3. The sample size is about 1,200 landlords; 2,400 dwellings (see Figure 3). The survey population is all identified rented dwellings within the sampled geospatial areas (meshblocks). The survey was designed based on the 1996 Census of Population and Dwellings. A scoping questionnaire was sent to all dwellings in the sampled areas to identify in-scope rental dwellings, which have been surveyed every quarter since. Furnished dwellings are excluded. Within the sampled meshblocks new rental dwellings are identified (from the Tenancy Bond data described above) and the landlords are birthed into the survey. This birthing process was mothballed for 5-years between 2001-06, which resulted in a steadily declining sample size until the process was reinstated in 2006 Q2 (Stats NZ, 2008).
+
+Non-response in a given quarter is imputed by carrying forward the last known rental value. For persistent non-response, the value is carried forward for five quarters before the non-respondent is assumed to be a 'death' and is removed from the sample (Krsinich, 2009).
+
+### Figure 3
+
+```{r s3, fig.height=3.8}
+
+#3. A look at survey demographics across time
+
+#3.1 Read the data
+n3 <- read.csv(url(paste0(root,"/survey/surveydemo.csv")))
+
+#3.2 Control order
+n3$ntype <- factor(n3$ntype, levels=c("target","achieved","with price change"))
+
+#3.3 Do plot
+sampsizePlot <- ggplot(data=n3)+
+  geom_rect(aes(xmin=as.Date(as.yearqtr("2001Q4")), xmax=as.Date(as.yearqtr("2006Q2")), ymin= -Inf, ymax = Inf),fill="#aac4dd", alpha=0.5)+
+  geom_text(data=filter(n3,rtype=="dwellings"), aes(x=as.Date(as.yearqtr("2002Q1")), y=2500, label="No \nbirths"), size=3, hjust=0, colour="white")+
+  geom_line(aes(as.Date(as.yearqtr(servper)),n,colour=ntype,linetype=ntype))+
+  facet_wrap(~rtype, scales="free")+
+  labs(title="Quarterly rent survey: Demographics \n",
+         subtitle="Sample size",
+          x="",y="",
+         caption="Source: Stats NZ")+
+  scale_colour_manual(values=pal1, name="")+
+   scale_linetype_discrete(name="")+
+  theme_ab()+
+  theme(legend.position = "bottom")
+
+sampsizePlot
+
+```
+
+The datset used for this analysis covered the period 2000 Q2 -- 2017 Q4; 69 quarters, survey data for two quarters (2001Q2 and 2012Q2) were missing. It contains 143,000 price observations, for 7,650 unique properties.
+
+# Developing a model
+
+## Current method: bilateral matched-sample
+
+Since 2000 Q1 a matched-sample approach has been used to control for the changing quality of the stock of rental dwellings. The matched-sample average price change is calculated for region by dwelling-size strata,[^4] which are aggregated, to total New Zealand, using expenditure weights (updated 3-yearly consistent with the rest of the CPI).
+
+In 2008 concerns were raised that the matched-sample approach might bias the index (downwards) since the approach excludes price change associated with newly rented dwellings (as these are unmatched in a bilateral index). A regression fixed-effects model (of the type proposed in this paper) was used by Krsinich (2009) to investigate the likely magnitude of the bias. Using the survey data for 2000-08, she concluded that "the current estimation method does well at controlling for compositional change" and "the restriction of the sample [to a bilateral matched-sample] is not biasing the price measurement to a level of any practical significance". With the passing of time, additional data is now available to investigate the use of longer rolling windows (and index-chain positions). Importantly, since June 2006 the survey data is unblemished by the reduced longitudinal match rates caused by the mothballed birthing process. The administrative data provides another dataset to triangulate our findings.
+
+[^4]: Broad region (Auckland, Wellington, Rest of North Island, Canterbury, Rest of South Island) by number of bedrooms (1,2,3,4+)
+
+## Property fixed-effects regression
+
+There is growing consensus that multilateral models are the best approach to measuring inflation (see, for example, ABS (2016), Diewert & Fox (2017)). The CPI Manual (ILO et al, 2004) is being updated to reflect this paradigm shift. However, there is not yet international agreement on which multilateral methods are best suited to estimating inflation from different types of data.
+
+The time dummy hedonic approach to constructing quality-adjusted price indexes is well-known and discussed in the CPI Manual (ILO et al., 2004, p382). In the absence of explicit quality characteristics (beyond location, number of bedrooms, and property type) fixed-effects regression (1) has been suggested for longitudinal data of prices. This approach is known as the Time Product Dummy (TPD) method, named after the Country Product Dummy (CPD) model proposed by Summers (1973).  
+
+The estimating equation is:
+\begin{equation}
+\ln{p_i^t}=\alpha + \sum_{t=1}^{T}\delta^tD{_i^t} + \sum_{i=1}^{N-1}\gamma_{i}D{_i} +\varepsilon{_i^t}
+\end{equation}
+
+where,
+$p_i^t$ is the price $p$ of property, $i$, at time, $t$;
+$D_i^t = 1$ if a price for property, $i$, is observed at time, $t$, and $=0$ otherwise;
+$D_i = 1$ if the observation relates to property, $i$, and $=0$ otherwise;
+$\alpha$, $\delta_t$ and $\gamma_i$ are regression estimates and $\varepsilon{_i^t}$ is an error term;
+dummies for item $N$ and period $0$ are excluded to identify the model.
+
+The index is derived from the estimated parameters on time; price change between period $0$ and period $t$ this can be expressed as:
+\begin{equation}
+P_{TPD}^{0,t}=\exp(\hat{\delta^t})
+\end{equation}
+
+Krsinich (2016) & Aizcorbe, Corrado and Doms (2003) suggest TPD is preferable to a time dummy hedonic approach, even if detailed characteristics are available. Krsinich (2016) showed that the TPD method is the same as a Time Dummy hedonic if all time invariant quality determining characteristics (and the interaction of these) are included in the regression. Aizcorbe, Corrado and Doms (2003) state the advantages of the TPD approach as:
+
+* does not impose a particular functional form
+* does not place any restrictions on the relationship between products and characteristics (as full interactions are implicitly included)
+* no need to choose characteristics
+* fixed-effects can provide more stable parameter estimates
+
+Ivancic, Diewert and Fox (2009) note that the method can be used to produce standard errors of the estimates, and Krsinich (2009) remarked that the regression controls for both observed and unobserved property characteristics.
+
+The fixed-effects regression, by definition, assumes that property characteristics (and importantly consumers relative valuation of these) is constant across time. It could be argued that this assumption is very restrictive, or even unrealistic, particularly as the time interval between $t$ and $t+1$ increases. However, as noted by Silver (2016, p19), something has to be held constant to separate price and quality change to estimate 'pure' price inflation. One way to consider this constraint is that it controls for the counterfactual -- how much *would* prices have changed *if* quality was constant -- to estimate inflation, rather than an assumption that needs to reflect reality. In reality, price and quality are insoluble. 
+
+### Model weights
+
+Diewert (2004), in the context of the Country Product Dummy model, suggested that Weighted Least Squares (WLS) should be used to reflect the economic importance of observed prices. Ivancic, Diewert and Fox (2009) applied this approach in the temporal context, weighting each observation by the square root of its expenditure share. We follow suit, noting that this was found to result in numerically similar estimates to those using OLS. This is consistent with de Haan and Krsinich (2014) who state that, from an econometric point of view, Ordinary Least Squares (OLS) would seem appropriate assuming the variance of the errors is constant (homoscedasticity). We also note that within quarters each price observation relates to a unique property, so the OLS model may be considered a 'democratically weighted' price index, as used for New Zealand's HLPIs (Bentley, 2016).
+
+# Refining the model: data window length and index-chain alignment
+
+A natural starting point to estimating model (1) may be to use all the data available, across all time periods. A criticism of this approach is that the estimate of the most recent period-on-period change is partly dependent on all other time periods, including the distant past. The term 'characteristicty' has been used to describe the influence of data in distant time periods on the comparison at hand (see Caves, Christensen and Diewert, 1982). The less influence distant time has, the greater the characteristicity.
+
+Characteristicity is often noted from a real-time perspective. For multilateral models, as additional periods of time occur, and are appended to the data, estimates for all period-on-period changes get updated (revised). Real-time estimation also leads to consideration of temporal sample-size equality -- the number of time periods (the time sample) used to estimate each period-on-period change. A natural starting point here may be to allow the data, including the number of time observations, to grow. Such an approach can be thought of as an expanding window of data (Chessa, 2016). Yet, this leads to a non-uniform temporal sample being used for estimation.
+
+Characteristicity can be increased by estimating the model based on a temporal subset, or 'window', of data. Using a window of fixed length ensures temporal sample equality, as the same number of time periods are used for each period-on-period estimate. 
+Greatest characteristicity can be achieved by considering data windows of the same size as the period-on-period change to be estimated. That is, to use bilateral methods. However, chained bilateral methods (bilateral estimates chained together over time) have a big disadvantage of not being transitive. Estimates of price change between chained time periods don't necessarily equal those from a bilateral comparison. A severe consequence on non-transitivity is chain drift bias (see Ivancic, Diewert and Fox, 2009).
+
+Within a given data window the property fixed-effects estimates will be transitive. To strike a balance between characteristicity and transitivity a chained rolling window, of fixed length, will be used. 
+
+Using both administrative and survey data, we find the choice of data window length can have a huge impact on estimates of cumulative inflation. A range of estimates from 55 percent (data window length of 3 quarters) to 127 percent (window of 90 quarters) were found for total inflation, in the 25-years to 2017 Q4, using the administrative data (Figure 4). A similar spread was discovered for the survey data -- see Appendix A.
+
+### Figure 4
+
+```{r s4}
+
+#4. Impact of data window length (admin data)
+
+#4.1 Read the data
+chained <- read.csv(url(paste0(root,"/admin/models_chained2.csv")))
+
+#4.2 Do the plot
+indexPlot <- ggplot(subset(chained,align=="mean"))+
+   geom_line(aes(as.yearqtr(period),index2-1,colour=length, alpha=length, group=length), size=.5)+
+   geom_line(data=subset(chained,align=="mean" & length==32),
+             aes(as.yearqtr(period),index2-1,linetype=as.factor(length)), size=1, colour=mbie.cols[2])+
+   theme_ab()+
+   scale_colour_continuous(low=mbie.cols[1],high=mbie.cols[5],
+                           breaks=c(2,32,64,90),
+                           name="Model of \nwindow \nlength \n(quarters) \n")+
+   guides(colour=guide_colorbar(barwidth=2, order=1))+
+   scale_linetype_discrete(name="Proposed")+
+   scale_alpha_continuous(limits=c(.1,1), guide="none")+
+   scale_y_continuous(labels=percent)+
+   labs(title="Impact of data window length \n",
+        subtitle="Administrative data, mean index-chain alignment",
+        y="Cummulative percent change",
+        x="",
+        caption="Source: MBIE")
+indexPlot
+
+```
+
+## Choosing a data window length
+
+There is a lack of consensus on approaches to determining appropriate data window lengths and index-chain alignment. The *Handbook on Residential Property Prices Indices* (Eurostat et al., 2013) suggests choosing a window length that "yields 'reasonable' results", but appears silent on how best to determine reasonable. Drechsler (1973) noted that "characteristicity and circularity [transitivity] are always ... in conflict with each other". de Haan (2015a) observed that "It is likely that the quality-adjusted prices from the TPD model approximate the quality-adjusted prices from the hedonic model better as the sample period grows and the number of matches for a particular item in the data increases. On the other hand, we do not want the sample period to become very long because this conflicts with the underlying assumption of fixed characteristics parameters. So there is a trade-off, but it is difficult to tell what the optimal sample period would be." Diewert & Fox (2017) suggest that the "longer the window length is, the more likely it is that substitution bias will increase".
+
+\newpage
+
+**Arguments in favour of:**
+
+| Shorter window                 | Longer window           |
+| ------------------------------ |:-----------------------:| 
+| Greater characteristicity      | Greater transitivity | 
+| Allows model parameters to change, reflecting changing quality and consumer preferences      | More infrequent price observations included    |   
+| Minimises substitution bias | Improved model fit      | 
+
+
+Ivancic, Diewert and Fox (2009) choose a window length of 13 months "as it allows for strongly seasonal commodities to be compared". It is noted they had high frequency scanner data, and only 15 months of data which limited their choice of maximum window length. Stats NZ and the Australian Bureau of Statistics (ABS, 2017) are using 9 quarter windows for consumer electronic and supermarket scanner data respectively. Silver (2016), in the context of property prices, notes that "a 10-year window ... with valuations of characteristics held constant may stretch credibility".
+
+### Product life-cycle diagnostics: Price observations per property
+
+A key consideration for determining a suitable data window length is the number of price observations per property. At least two price observations are needed for a property to have an impact on the estimated inflation rate. Since the fixed-effects approach is a longitudinal methodology the model will fit the data better as the number of observations increase.
+
+### Figure 5
+
+```{r s5, fig.height=3}
+
+#5. Price observations per property (admin data)
+
+#5.1 Read the data
+occ_sum2 <- read.csv(url(paste0(root,"/admin/occurance_summary.csv")))
+
+#5.2 Create decade and window length in years
+occ_sum3 <- occ_sum2 %>%
+            mutate(decade=substr(win_start,1,3),
+                   decade=ifelse(decade==199,"1990s",ifelse(decade==200,"2000s","2010s")),
+                   win_years=round(win_days/365))
+
+#5.3 Gather average and median occurances
+occ_sum5 <- occ_sum3 %>%
+   rename(Average=Ave_obs_q, Median=Median_obs_q) %>%
+   gather(type,ave,-c(win_years, win_start,win_end,win_days,decade))
+
+#5.4 Create 'chosen window length' box
+win_years <- 8
+ave <- Inf
+chosen <- data.frame(win_years, ave)
+
+#5.5 Do the plot
+occPlot <- ggplot(occ_sum5, aes(win_years, ave))+
+   geom_bar(data=chosen, stat="identity", fill="grey", alpha=.5)+
+   geom_point(data=filter(occ_sum5, type=="Average"), size=5, shape=95, aes(colour=decade), size=2)+
+   geom_text(x=8,y=1,label="8 years", hjust=0, size=3, colour="grey")+
+   facet_wrap(~type)+
+   geom_point(data=filter(occ_sum5, decade=="1990s" & type=="Median"), aes(colour=decade), size=6, shape=18)+
+   geom_point(data=filter(occ_sum5, decade=="2000s" & type=="Median"), aes(colour=decade), size=4, shape=18)+
+   geom_point(data=filter(occ_sum5, decade=="2010s" & type=="Median"), aes(colour=decade), size=2, shape=18)+
+   theme_ab()+
+   scale_colour_manual(values=mbie.cols,
+                       name="Window \nstart \ndecade")+
+   labs(title="Price observations per property",
+        subtitle="",
+        y="", x="Window length, years",
+        caption="Source: MBIE")
+occPlot
+
+```
+
+To be a multilateral method at least 3 observations are needed. This condition is not required for every property, yet the greater the proportion of properties with multiple observations the more representative the data window will be of the rental population. This consideration may lead us to consider a minimum data window length of 6 years, so the median number of price observations is at least 3 (Figure 5). Looking at the average number of price observations, there appears to be a trend of decreasing frequency of observations (the average length of tenancies may be increasing)[^5] so a slightly longer window length may be desirable in case this trend continues.
+
+[^5]: The increasing average tenancy lengths observed in the data is partly a reflection of the dataset building-up over time, as each historical long tenancy is required to become compliant with the bond lodgement legislation when a new tenancy begins. Yet price-change frequency statistics for the survey data (Appendix B) also display evidence of decreasing frequency of price change.
+
+Properties with only one observation (Figure 6) are of particular interest as they will not be included in the fixed-effects estimator. We should therefore seek to minimise the proportion of properties with only one observation, in case there is a differential rate of inflation for these properties.
+
+### Figure 6
+
+```{r s6, fig.height=3, fig.width=5}
+
+#6. Properties with only one observation (admin data)
+
+#6.1 Read the data
+occ_dis2 <- read.csv(url(paste0(root,"/admin/occurance_distribution.csv")))
+
+#6.2 Create 'chosen window length' box
+win_years <- 8
+prop <- Inf
+chosen2 <- data.frame(win_years, prop)
+
+#6.3 Create decade and window length in years
+occ_dis5 <- occ_dis2 %>%
+   mutate(decade=substr(win_start,1,3),
+          decade=ifelse(decade==199,"1990s",ifelse(decade==200,"2000s","2010s")),
+          win_years=round(win_days/365)) %>%
+         filter(Observations==1)
+
+#6.4 Do the plot
+occ1Plot <- ggplot(occ_dis5, aes(win_years,prop))+
+   geom_bar(data=chosen2, stat="identity", fill="grey", alpha=.5)+
+   geom_point(size=5, shape=95, aes(colour=decade))+
+   geom_label(x=8,y=.15,label="Chosen window length \n8 years", hjust=0)+
+   theme_ab()+
+   scale_colour_manual(values=mbie.cols,
+                       name="Window \nstart \ndecade")+
+   scale_y_continuous(labels=percent)+
+   labs(title="Proportion of properties with only one price observation",
+        subtitle="",
+        y="", x="Window length, years",
+        caption="Source: MBIE")
+occ1Plot
+
+```
+
+## Index-chain alignment
+
+To create a timeseries longer than the chosen window length, requires a choice of index-chain position (Figure 7). Rolling multilateral windows will overlap for multiple time periods. The natural choice, from a real-time estimation perspective, may be to link on the most recent overlap period. That is, the end of the time series in the previous window and the lagged one period end of the time series in the newer window -- **'end' chain alignment**. However, such an approach does not allow for the affect of new products to be captured in the chained timeseries. Following Krsinich (2016) an index-chain alignment at the most distant overlap period would alleviate this problem -- **'start' chain alignment**. Yet, by symmetry, this would create the opposite issue of not capturing well the affect of disappearing products. de Haan (2015) suggests a **'mid' chain alignment** and Diewert & Fox (2017) suggested using the geometric mean of all possible overlaps -- **'mean' chain alignment**.
+
+### Figure 7
+
+```{r s7, fig.height=3}
+ 
+#7. Index-chain alignment options
+
+#7.1 Read the data
+models2 <- read.csv(url(paste0(root,"/admin/models2.csv")))
+
+models3 <- models2 %>%
+            mutate(preperiod=lag(period,1))
+
+models4 <- models2 %>%
+            mutate(period=lag(period,1)) %>%
+            rbind(models2)
+
+#7.2 Do the plot
+alignPlot <- ggplot(subset(models2,as.numeric(window)<=9 & length==8), aes(as.yearqtr(period),as.numeric(window)))+
+            geom_line(data=subset(models4,as.numeric(window)<=9 & align=="end" & length==8),
+                      aes(alpha=paste0(align,window)), colour=mbie.cols[1])+
+            geom_line(data=subset(models4,as.numeric(window)<=9 & align=="mid" & length==8),
+                      aes(alpha=paste0(align,window)), colour=mbie.cols[2])+
+            geom_line(data=subset(models4,as.numeric(window)<=9 & align=="start" & length==8),
+                      aes(alpha=paste0(align,window)), colour=mbie.cols[3])+
+            geom_point(size=4, fill="white", shape=21, colour="grey")+
+            geom_point(data=subset(models3,as.numeric(window)<=9 & align!="other" & length==8),
+                       aes(x=as.yearqtr(preperiod), colour=align), size=4, fill="white", shape=21)+
+            geom_point(data=subset(models2,as.numeric(window)<=9 & align!="other" & length==8),
+                       aes(fill=align, colour=align), size=4, shape=21)+
+            theme_ab()+
+            theme(axis.text.x=element_blank())+
+            scale_fill_manual(values=mbie.cols,
+                                name="Position")+
+            scale_colour_manual(values=mbie.cols,
+                                name="Position")+
+            scale_alpha_discrete(range=c(1,1), guide="none")+
+            scale_y_continuous(breaks=c(1:8))+
+            labs(title="Index-chain alignment options \n",
+                 subtitle="2 year rolling windows \n",
+                 x="Time period",y="Data window")+
+            theme(panel.grid=element_blank(),
+                  axis.line=element_line(arrow=arrow()))
+alignPlot
+
+```
+
+An advantage of the mean alignment is that for time periods where the desired window length is unavailable (due to right or left censored data), the mean of all available window lengths can be used as a best estimate. Hence, mean-chain alignment results in an estimate for all time periods. For this reason, and small observed differences between index-chain alignment from our sensitivity analysis (see Appendix C), we have chosen this option.[^6]
+
+[^6]: Appendix D, shows the impact of data window length regionally. This helps to demonstrate the link between the number of longitudinal price observations and sensitivity to the temporal subset used as a data window.
+
+## Real-time estimation, with a 'no revision' constraint
+
+An important additional consideration for a price index used for indexation of monetary payments is to add a *no revision of historical timeseries* constraint. That is, the first published estimate is never revised.[^7] The constraint ensures that first published period-on-period change can be used for indexation with the confidence that the official estimate is final.
+
+[^7]: Or only in exceptional circumstances, such as a large data processing error.
+
+The four index-chain align options (start, mid, end, mean), can be applied as a catch-up (revision) factor in the latest period, as additional data become available. Using a revision factor in the latest time period, helps to ensure that the long-run index is not biased should the model tend to be revised in a common direction (up or down) as additional data becomes available (see Krsinich, 2016). The cost to this approach, is that the period-on-period change now reflects both the observed change between the periods at hand, and a bias correction factor.
+
+Preference for **end index-chain alignment** leads to a **'movement splice'**, where there is no revision factor.
+
+Preference for **start index-chain alignment** leads to a **'window splice'**, where the revision factor is determined by the difference between the old and new estimates for the cumulative change for the periods common to old and new windows. Revisions to estimates for a particular period will affect the latest period-on-period change until sufficient real-time as elapsed to generate data to calculate the start index-chain aligned series.
+
+Following the notation of White (2018), let $P_{OLD}$ be the index computed over periods $1$ to $w$ and let $P_{NEW}$ be the index computed over the window rolled forward one period, from periods $2$ to $w+1$. The window splice index between periods $w$ and $w+1$ can be expressed as:
+\begin{equation} P_{WindowSplice}^{w,w+1} = \frac{P_{NEW}^{w+1}/P_{NEW}^{2}}{P_{OLD}^{w}/P_{OLD}^{2}} \end{equation}
+
+To explicitly see the revision factor we can rewrite this as:
+\begin{equation} P_{WindowSplice}^{w,w+1} = \frac{P_{NEW}^{w+1}}{P_{NEW}^{w}} \times \frac{P_{NEW}^{w}/P_{NEW}^{2}}{P_{OLD}^{w}/P_{OLD}^{2}} \end{equation}
+where the first term is the movement splice estimate and the second term is the revision factor.
+
+Preference for **mid index-chain alignment** leads to a **'half-window splice'**, where the revision factor is determined by the difference between the old and new estimates for the cumulative change for the periods belonging to second half of the common periods for old and new windows. Revisions to estimates for a particular period will affect the latest period-on-period change until sufficient real-time as elapsed to generate data to calculate the mid index-chain aligned series.
+
+The half-window splice index can be expressed as:
+\begin{equation} P_{HalfWindowSplice}^{w,w+1} = \frac{P_{NEW}^{w+1}}{P_{NEW}^{w}} \times \frac{P_{NEW}^{w}/P_{NEW}^{w/2}}{P_{OLD}^{w}/P_{OLD}^{w/2}} \end{equation}
+
+Preference for **mean index-chain alignment** leads to a **'mean splice'**, where the revision factor is determined by the geometric mean of all possible overlaps.
+\begin{equation} P_{MeanSplice}^{w,w+1} = \frac{P_{NEW}^{w+1}}{P_{NEW}^{w}} \times \left( \prod_{t=2}^{w} \frac{P_{NEW}^{w}/P_{NEW}^{t}}{P_{OLD}^{w}/P_{OLD}^{t}} \right)^{\frac{1}{w}} \end{equation}
+
+For many macroeconomic purposes, a no revision constraint is likely to be unnecessarily restrictive (see Silver, 2016, p20). Consistent with other macroeconomic statistics, publication of a revisable price index who's quality improves as more data becomes available is likely to be helpful to improve understanding of the economy. Such a series could usefully be published alongside the non-revisible official series. As a minimum it serves as a benchmark to understand the impact of including a no revision constraint. 
+
+Consistent with our choice of mean index-chain alignment, we proposed adopting a mean splice. There was little observed difference between the revisable chained series and the non-revisable spliced series (see Figure 8)
+
+### Figure 8
+
+```{r s8, fig.height=4}
+ 
+#8. Impact of revision constraint (admin data)
+
+#8.1.1 Read the spliced series ('no revision' constraint)
+splice4 <- read.csv(url(paste0(root,"/admin/models_splice2.csv")))
+
+#8.1.2 Read the chained series (revisable)
+rw_models3 <- read.csv(url(paste0(root,"/admin/models_chained2.csv")))
+
+#8.2 Select mean alignment/splice type & window length of 32 quarters
+
+#8.2.1 spliced series (no revision constraint)
+splice5 <- splice4 %>%
+            filter(splice_type=="Mean" & length==32) %>%
+            mutate(revisable="Non-revisable", index = index/index[period=="2001 Q1"],
+                   cum_change.a=index-1) %>%
+            select(-window) %>%
+            rename(align=splice_type)
+
+#8.2.3 chained series (revisable)
+
+rw_models5 <- rw_models3 %>%
+               filter(align=="mean" & length==32) %>%
+               mutate(revisable="Revisable", index = index2/index2[period=="2001 Q1"],
+                      cum_change.a=index-1) %>%
+               select(-pos,-ratio_change.q,-change.q,-index2)
+
+#8.2.3 combine
+rev <- rbind(splice5, rw_models5)
+
+rev2 <- rev %>%
+         select(-index) %>%
+         rename(Annual=change.a,Cumulative=cum_change.a) %>%
+   gather(type,val,-c(period,length,align,revisable))
+
+#8.3 Do the plot
+revPlotai <- ggplot(filter(rev2,as.yearqtr(period)>=min(as.yearqtr("2002 Q1"))), aes(as.yearqtr(period),val, colour=revisable, linetype=revisable))+
+   geom_line(size=1)+
+   facet_wrap(~type, scales = "free")+
+   theme_ab()+
+   scale_y_continuous(labels=percent)+
+   scale_colour_manual(values=mbie.cols,
+                       name="")+
+   scale_linetype_discrete(name="")+
+   labs(title="Impact of revision constraint",
+        subtitle="Percent change",
+        x="", y="",
+        caption="Source: MBIE")+
+   theme(legend.position="bottom")
+revPlotai
+
+```
+
+
+# Timing of recording price change
+
+The final issue to be addressed is to consider the timing of recording price change. Rent price changes are only observed in the bond data when tenancies begin, or a new bond lodgement form is submitted (for example, if the landlord wants to increase the bond amount as well as the weekly rent). In contrast, price changes are observed in the survey-sample approach whenever the rent amount changes, regardless of whether this is a new or existing tenancy. By applying the same rent price inflation estimator to both survey and administrative dataset, we can take a closer look at the impact. If there was no difference in coverage or data quality between the two data sources, the differences in price indexes would reflect only timing differences (and random sampling noise).
+
+### Figure 9
+
+```{r s9, fig.height=4}
+
+#9. Timing of recording price change
+
+#9.1 Read the chained survey model 
+survey_chainedmodel <- read.csv(url(paste0(root,"/survey/chainedmodelsi.csv")))
+
+#9.2 Tidy up the survey model data
+survey_chainedmodel2 <- survey_chainedmodel %>%
+   group_by(length,pos,align) %>%
+   filter(as.Date(as.yearqtr(period))>="2006-04-01") %>%
+   mutate(index2000 = index2/index2[1],
+          datasource = "survey",
+          cum_change.a=index2000-1)
+
+#9.3 Read the chained admin model
+chained2 <- read.csv(url(paste0(root,"/admin/models_chained2.csv")))
+
+#9.4 Tidy up the admin model data
+chained3 <- chained2 %>%
+   group_by(length,pos,align) %>%
+   filter(as.Date(as.yearqtr(period))>="2006-04-01") %>%
+   mutate(index2000 = index2/index2[1],
+          datasource = "administrative",
+          cum_change.a=index2000-1)
+
+#9.5 Combine
+s_a_chainedmod <- rbind(survey_chainedmodel2,chained3)
+
+s_a_chainedmod2 <- s_a_chainedmod %>%
+         select(-index2000,-index2, -change.q, -ratio_change.q) %>%
+         rename(Annual=change.a,Cumulative=cum_change.a) %>%
+   gather(type,val,-c(period,length,pos,align,datasource))
+
+#9.6 Plot
+sourcePlot <- ggplot(subset(s_a_chainedmod2,align=="mean" & length %in% c(32)))+
+   geom_line(aes(as.Date(as.yearqtr(period)),val,colour=datasource, linetype=datasource, group=datasource), size=1)+
+   facet_wrap(~type, scales = "free")+
+   theme_ab()+
+   scale_colour_manual(values=c(mbie.cols[1],pal1),
+                           name="")+
+   scale_linetype_discrete(name="")+
+   scale_y_continuous(labels=percent)+
+   labs(title="Impact of data source \n",
+        subtitle="Mean index-chain alignment, 8 year rolling window",
+        y="",
+        x="",
+        caption="Source: MBIE & Stats NZ")+
+   theme(legend.position="bottom")
+sourcePlot
+
+```
+
+Looking at the cumulative inflation since 2006 (after the survey birthing process was reestablished) the estimates are similar for both data sources (Figure 9). This suggests that despite an aging survey design, and imperfect administrative data, both datasets are of reasonable quality (or at least of similar quality). The lower rate shown in the survey data since 2015 is also reflected in a comparatively lower average price increase (geometric mean) over the same time span. This may be partly explained by the static survey sample size in recent years (see Figure 2).
+
+Applying the same model to both datasets, we find that differences in the timing of recorded price change, appear short-lived and result in only a small impact on cumulative inflation. Short-run differences look to reflect rental 'stock' inflation for the survey data and rental 'flow' price inflation for administrate data. We have tested this by running the model over a subset of the survey data, limited to observations that were a change in price from the previous quarter. Shown in Figure 10, the price-change-only survey data looks to reflect a flow measure, hence closely track the administrative series.  
+
+### Figure 10
+
+```{r s10, fig.height=4}
+
+#10. Trend comparisons for stock vs flow
+
+#10.1 Read the chained survey model, using only price-change observations
+survey_chainedmodel_changeonly <- read.csv(url(paste0(root,"/survey/chainedmodelsc.csv")))
+
+#10.2 Tidy up the data
+survey_chainedmodel_changeonly2 <- survey_chainedmodel_changeonly %>%
+   group_by(length,pos,align) %>%
+   filter(as.Date(as.yearqtr(period))>="2006-04-01") %>%
+   mutate(index2000 = index2/index2[1],
+          datasource = "survey, \nprice change \nobservations \nonly",
+          cum_change.a=index2000-1)
+
+#10.3 Combine
+s_a_chainedmod <- rbind(survey_chainedmodel2, survey_chainedmodel_changeonly2, chained3)
+
+s_a_chainedmod2 <- s_a_chainedmod %>%
+         select(-index2000,-index2, -change.q, -ratio_change.q) %>%
+         rename(Annual=change.a,Cumulative=cum_change.a) %>%
+   gather(type,val,-c(period,length,pos,align,datasource))
+
+#10.4 Read the published CPI rent series
+cpi <- read.csv(url(paste0(root,"/published/cpi_rent.csv")))
+
+#10.5 Tidy up the data
+cpi2 <- cpi %>%
+   rename(index=NZ) %>%
+   mutate(change.a = index/lag(index,4)-1,
+          model_type="published series") %>%
+   filter(as.yearqtr(period)>=as.yearqtr("2006 Q2"))
+
+#10.6 Plot
+s_changePlot <- ggplot(subset(s_a_chainedmod,align=="mean" & length==32))+
+   geom_line(aes(as.Date(as.yearqtr(period)),change.a,colour=datasource, group=datasource), size=1, alpha=.5)+
+   geom_smooth(aes(as.Date(as.yearqtr(period)),change.a,colour=datasource, group=datasource),span=.3,size=2,se=F)+
+   geom_line(data=cpi2,aes(as.Date(as.yearqtr(period)),change.a, linetype=model_type))+
+   scale_linetype_manual(name="", values=c("dotted","solid","longdash"))+
+   theme_ab()+
+   scale_colour_manual(values=c(mbie.cols[1],pal1[1],"#ffab40"),
+                           name="Data source \n")+
+   scale_y_continuous(labels=percent)+
+   labs(title="Impact of data source: Trends \n",
+        subtitle="Mean index-chain alignment, 8 year rolling window",
+        y="Percent change",
+        x="",
+        caption="Source: MBIE & Stats NZ")
+s_changePlot
+ 
+```
+
+Consistent with the findings of Bentley and Krsinich (2017) the flow measure shows relatively more volatility and earlier identification of turning-points in the timeseries. This makes sense as the information from newly lodged bonds reflects the current market price for rental properties. The within tenancy rent price changes (captured in the survey, but omitted from the administrative data) perhaps don't reflect true market rent. They may reflect a discount for loyalty and cost savings to the landlord compared with finding replacement tenants.  
+
+It is unclear which measure should be conceptually preferred for a CPI. Since the long-run inflation rates appear similar the choice may not matter much for indexation of monetary payments. For macroeconomic uses of the CPI, the added volatility of the flow measure may be acceptable if this reflects market changes and allows for faster identification of turning points. Johnson (2015, p131), in the context of using rent price inflation for the rental equivalence approach to measuring owner-occupiers' housing costs, notes that the stock approach is currently used in the UK (and at other national statistical institutes). He notes that arguments could be made for using the marginal (flow) of rent depending on 'the question that rental equivalence seeks to answer'.
+
+A final way to approach this choice is from a practical view point. If a strong case can't be made for a preferred concept, the administrative data is a clear winner on cost and efficiency.
+
+# Conclusions
+
+The catalyst for this work was the tenancy bond Open Data released by MBIE. This enabled public comparison of the change in average rent prices with the quality-adjusted counterpart, as published for the CPI & HLPIs, albeit from a different data source. We find that much of the observed differences between these series can be explained as bias quality adjustment resulting from the use of a bilateral matched-model approach. Using a suitably specified multilateral model to perform quality-adjustment, differences are much smaller and short-lived. Given relatively infrequent changes in rent prices, compared with many retail prices, a relatively long data window (such as 32 quarters; 8 years) appears necessary to provide reasonable transitivity and property-level matches and therefore minimise long-run bias. 
+
+Index-chain alignment and revisions due to additional data are important considerations for all multilateral price models. Yet, these design choices have been found to be of less importance for our rent price data compared with the impact of data window length. Following sensitivity analysis we propose: 
+
+* in retrospect, windows can be chained using the (geometric) mean of all available estimates 
+* in real-time, the model can be updated with a mean splice to preserve historical timeseries, with a 'no revision' constraint. 
+
+Employing the same model on survey and administrative data we have been able to focus on the impact of stock versus flow measures of rent price inflation. We have been able to mimic a flow approach on the survey data, by subseting the data to price-change-only observations. If needed, the estimates from administrative data could be lagged and smoothed to mimic a stock-based measure. Removing the need for a separate (Stats NZ) survey of landlords would reduce operational costs, negate survey burden, and bring consistency across the official statistics system, with a single authoritative measure of rent price inflation in New Zealand. Series could be published monthly, with a fine regional breakdown.
+
+
+# Appendix A: Sensitivity to data window length (survey data)
+
+### Figure A1
+
+```{r s11, fig.height=5}
+
+survmod <- read.csv(url(paste0(root,"/survey/chainedmodelsi.csv")))
+
+survmod2 <- survmod %>%
+   filter(as.yearqtr(period)>=as.yearqtr("2001 Q1")) %>% #limit to align with 'normal' published series
+  select(period,length,align,change.a,index2) %>%
+  filter(align=="mean") %>%
+  mutate(Cumulative=index2-1) %>%
+  select(-index2) %>%
+  rename(Annual=change.a) %>%
+  gather(type,val,-c(period,length,align))
+
+cpi3 <- cpi %>%
+   filter(as.yearqtr(period)>=as.yearqtr("2001 Q1")) %>%
+   rename(index=NZ) %>%
+   mutate(Cumulative=(index/index[1])-1,
+          change.a = index/lag(index,4)-1,
+          model_type="published series") %>%
+   rename(Annual=change.a) %>%
+   select(-index) %>%
+  gather(type,val,-c(period,model_type))
+
+
+icPlot <- ggplot(survmod2)+
+  geom_line(aes(as.yearqtr(period),val,colour=length, group=length), size=.5)+
+  geom_line(data=subset(survmod2, length==32),
+            aes(as.yearqtr(period),val,linetype=as.factor(length)), size=1, colour=pal1[5])+
+geom_line(data=cpi3, aes(as.yearqtr(period),val, alpha=model_type), colour=pal1[2], linetype="dotted")+
+  theme_ab()+
+  facet_wrap(~type, scales = "free")+
+  scale_colour_continuous(low=pal1[1],high=pal1[4],
+                          breaks=c(2,16,32,48,60),
+                          name="Model of \nwindow \nlength \n(quarters) \n")+
+   scale_alpha_discrete(range=c(1,1), name="")+
+  scale_linetype_discrete(name="Proposed \nlength \n(quarters)")+
+  scale_y_continuous(labels=percent)+
+  labs(title="Impact of data window length \n",
+       subtitle="Survey data, mean index-chain alignment",
+       y="",
+       x="",
+       caption="Source: Stats NZ") +
+  theme(legend.position="bottom") +
+   guides(alpha = guide_legend(order=1))
+icPlot
+
+```
+
+It is noted that the model with a 2 quarter window is not the same as the published series. We have not employed the survey weighting used for the official series (as the weights were not easily obtainable). Additionally, we have not replicated ad hoc quality adjustment that is manually applied for some properties that undergo 'large' renovations.
+
+# Appendix B: Price change observations, using survey data
+
+### Figure B1
+
+```{r s12, fig.height=3}
+
+occ_sum2 <- read.csv(url(paste0(root,"/survey/occurance_summary.csv")))
+
+occ_sum3 <- occ_sum2 %>%
+            mutate(decade=substr(win_start,1,3),
+                   decade=ifelse(decade==199,"1990s",ifelse(decade==200,"2000s","2010s")),
+                   win_years=round(win_days/365))
+
+occ_sum5 <- occ_sum3 %>%
+   rename(Average=Ave_obs_q, Median=Median_obs_q) %>%
+   gather(type,ave,-c(win_years, win_start,win_end,win_days,decade))
+
+win_years <- 8
+ave <- Inf
+chosen <- data.frame(win_years, ave)
+
+occPlot <- ggplot(occ_sum5, aes(win_years, ave))+
+   geom_bar(data=chosen, stat="identity", fill="grey", alpha=.5)+
+   geom_point(data=filter(occ_sum5, type=="Average"), size=5, shape=95, aes(colour=decade), size=2)+
+   geom_text(x=8,y=1,label="8 years", hjust=0, size=3, colour="grey")+
+   facet_wrap(~type)+
+   geom_point(data=filter(occ_sum5, decade=="1990s" & type=="Median"), aes(colour=decade), size=6, shape=18)+
+   geom_point(data=filter(occ_sum5, decade=="2000s" & type=="Median"), aes(colour=decade), size=4, shape=18)+
+   geom_point(data=filter(occ_sum5, decade=="2010s" & type=="Median"), aes(colour=decade), size=2, shape=18)+
+   theme_ab()+
+   scale_colour_manual(values=pal1,
+                       name="Window \nstart \ndecade")+
+   labs(title="Price-change observations per property",
+        subtitle="Survey data",
+        y="", x="Window length, years",
+        caption="Source: Stats NZ")
+occPlot
+
+```
+
+### Figure B2
+
+```{r s13, fig.height=3}
+
+occ_dis2 <- read.csv(url(paste0(root,"/survey/occurance_distribution.csv")))
+
+win_years <- 8
+prop <- Inf
+chosen2 <- data.frame(win_years, prop)
+
+occ_dis5 <- occ_dis2 %>%
+   mutate(decade=substr(win_start,1,3),
+          decade=ifelse(decade==199,"1990s",ifelse(decade==200,"2000s","2010s")),
+          win_years=round(win_days/365)) %>%
+         filter(Observations==1)
+
+occ1Plot <- ggplot(occ_dis5, aes(win_years,prop))+
+   geom_bar(data=chosen2, stat="identity", fill="grey", alpha=.5)+
+   geom_point(size=5, shape=95, aes(colour=decade))+
+   geom_label(x=8,y=.1,label="Chosen window length: 8 years", hjust=0)+
+   theme_ab()+
+   scale_colour_manual(values=pal1,
+                       name="Window \nstart \ndecade")+
+   scale_y_continuous(labels=percent)+
+   labs(title="Proportion of properties with only one price-change observation",
+        subtitle="Survey data",
+        y="", x="Window length, years",
+        caption="Source: Stats NZ")
+occ1Plot
+
+```
+
+# Appendix C: Index-chain alignment simulations
+
+### Figure C1
+
+```{r s14, fig.height=5}
+ 
+survey_chainedmodel <- read.csv(url(paste0(root,"/survey/chainedmodelsi.csv")))
+
+survey_chainedmodel2b <- survey_chainedmodel %>%
+   group_by(length,pos,align) %>%
+   mutate(index2000 = index2/index2[1],
+          datasource = "survey",
+          cum_change.a=index2000-1)
+
+chained2 <- read.csv(url(paste0(root,"/admin/models_chained2.csv")))
+
+chained4 <- chained2 %>%
+   group_by(length,pos,align) %>%
+   mutate(index2000 = index2/index2[1],
+          datasource = "administrative",
+          cum_change.a=index2000-1)
+
+s_a_chainedmodb <- rbind(survey_chainedmodel2b,chained4)
+
+s_a_chainedmod2b <- s_a_chainedmodb %>%
+         select(-index2000,-index2, -change.q, -ratio_change.q) %>%
+         rename(Annual=change.a,Cumulative=cum_change.a) %>%
+   gather(type,val,-c(period,length,pos,align,datasource))
+
+s_changePlot2 <- ggplot(subset(s_a_chainedmodb,align!="other" & length==32))+
+   geom_line(aes(as.Date(as.yearqtr(period)),change.a,colour=align), size=1)+
+   theme_ab()+
+   facet_wrap(~datasource, scales="free")+
+   scale_colour_manual(values=c(mbie.cols),
+                           name="Index-chain alignment:")+
+   scale_y_continuous(labels=percent)+
+   labs(title="Index-chain alignment \n",
+        subtitle="8 year rolling window",
+        y="Percent change",
+        x="",
+        caption="Source: MBIE & Stats NZ")+
+   theme(legend.position = "bottom")
+s_changePlot2
+
+```
+
+
+# Appendix D: Regional comparisons
+
+### Figure D1
+
+```{r s15, fig.height=5}
+
+#By region
+
+s_rw_models_reg1 <- read.csv(url(paste0(root,"/survey/chainedmodels_regi1.csv")))
+s_rw_models_reg2 <- read.csv(url(paste0(root,"/survey/chainedmodels_regi2.csv")))
+s_rw_models_reg3 <- read.csv(url(paste0(root,"/survey/chainedmodels_regi3.csv")))
+s_rw_models_reg4 <- read.csv(url(paste0(root,"/survey/chainedmodels_regi4.csv")))
+s_rw_models_reg5 <- read.csv(url(paste0(root,"/survey/chainedmodels_regi5.csv")))
+
+s_rw_models_reg <- rbind(s_rw_models_reg1, s_rw_models_reg2, s_rw_models_reg3,
+                         s_rw_models_reg4, s_rw_models_reg5) %>%
+                     mutate(datasource = "survey") %>%
+                     select(-region) %>%
+                     rename(region=regname)
+
+chainedRa <- read.csv(url(paste0(root,"/admin/models_chained_r5a.csv")))
+chainedRb <- read.csv(url(paste0(root,"/admin/models_chained_r5b.csv")))
+chainedRc <- read.csv(url(paste0(root,"/admin/models_chained_r5c.csv")))
+chainedRd <- read.csv(url(paste0(root,"/admin/models_chained_r5d.csv")))
+chainedRe <- read.csv(url(paste0(root,"/admin/models_chained_r5e.csv")))
+
+chainedR <- rbind(chainedRa, chainedRb, chainedRc,
+                  chainedRd, chainedRe)
+
+chainedR2 <- chainedR %>%
+   mutate(datasource = "administrative", source="analytical")
+
+s_rw_models_reg2 <- rbind(s_rw_models_reg,chainedR2)
+
+cpir <- read.csv(url(paste0(root,"/published/cpi_rent_r.csv"))) %>%
+   mutate(period=as.yearqtr(period)) %>%
+   gather(region,index,-period) %>%
+   mutate(region=gsub("\\."," ",region)) %>%
+   group_by(region) %>%
+   mutate(change.a = index/lag(index,4)-1,
+          model_type="published series")
+
+s_changePlot_r3 <- ggplot(subset(s_rw_models_reg2,align=="mean" & as.yearqtr(period)>="2000 Q3" &
+                                    length ==32))+
+   geom_line(aes(as.yearqtr(period),change.a,colour=datasource, group=datasource), size=1)+
+   geom_line(data=cpir, aes(as.yearqtr(period),change.a,linetype=model_type),colour=pal1[2])+
+   facet_wrap(~region)+
+   theme_ab()+
+   scale_colour_manual(values=c(mbie.cols[1],pal1), name="Proposed model")+
+   scale_linetype_manual(values=c("dotted"),name="")+
+   scale_y_continuous(labels=percent)+
+   labs(title="Impact of data source: by region \n",
+        subtitle="Mean index-chain alignment, 8 year rolling window",
+        y="Annual percent change",
+        x="",
+        caption="Source: Stats NZ & MBIE")+
+   theme(axis.text.x = element_text(angle = 90),
+         legend.position = c(0.85,0.2))
+s_changePlot_r3
+
+```
+
+
+### Figure D2
+
+```{r s16, echo=FALSE, fig.height=8}
+
+chainedR3 <- chainedR %>%
+         filter(align=="mean") %>%
+         mutate(cum_change.a=index2-1, win_years=length/4) %>%
+         select(-index2, -change.q, -ratio_change.q, -align, -pos, -length) %>%
+         rename(Annual=change.a,Cumulative=cum_change.a) %>%
+   gather(type,val,-c(period,win_years,region))
+
+occ_sum2 <- read.csv(url(paste0(root,"/admin/occurance_summary_region2.csv")))
+
+occ_sum3 <- occ_sum2 %>%
+            mutate(decade=substr(win_start,1,3),
+                   decade=ifelse(decade==199,"1990s",ifelse(decade==200,"2000s","2010s")),
+                   win_years=round(win_days/365),
+                   type="Observations") %>%
+            rename(period=win_end, val=Ave_obs_q) %>%
+            select(type,val,period,win_years,region)
+
+#Control order of groups
+chainedR2$region <- factor(chainedR2$region, levels=c("Auckland",
+                                                              "Wellington",
+                                                              "Rest of North Island",
+                                                              "Canterbury",
+                                                              "Rest of South Island"))
+
+changePlot_r2 <- ggplot(chainedR3)+
+   geom_line(aes(as.yearqtr(period),val*100,colour=win_years, group=win_years), size=.5)+
+   geom_line(data=subset(chainedR3, win_years==8),
+             aes(as.yearqtr(period),val*100,linetype=as.factor(win_years)), size=.5, colour=mbie.cols[2])+
+   geom_point(data=occ_sum3, aes(as.yearqtr(period),val,alpha=win_years), size=.5, stroke=1, fill="white")+
+   geom_point(data=subset(occ_sum3, win_years==8), aes(as.yearqtr(period),val,alpha=win_years), size=.5, colour=mbie.cols[2])+
+   facet_grid(type~region, scales="free", labeller = labeller(region = label_wrap_gen(20)))+
+   theme_ab()+
+   scale_colour_continuous(low=mbie.cols[1],high=mbie.cols[5],
+                           breaks=c(1,8,16,22),
+                           name="Model of \nwindow \nlength \n(years) \n")+
+   scale_linetype_discrete(name="Proposed \nlength \n(years)")+
+   scale_alpha_continuous(name="Window \nlength \n(years)",
+                          guide=guide_legend(direction="vertical"),
+                          breaks=c(5,15,25))+
+   labs(title="Impact of data window length, by region \n",
+        subtitle="Administrative data, \n \npercent change compared with average observations per property",
+        y="",
+        x="",
+        caption="Source: MBIE")+
+   theme(legend.position="bottom")
+changePlot_r2
+
+```
+
+
+
+### Figure D3
+
+```{r s17, echo=FALSE, fig.height=8}
+
+s_rw_models_reg1 <- read.csv(url(paste0(root,"/survey/chainedmodels_regi1.csv")))
+s_rw_models_reg2 <- read.csv(url(paste0(root,"/survey/chainedmodels_regi2.csv")))
+s_rw_models_reg3 <- read.csv(url(paste0(root,"/survey/chainedmodels_regi3.csv")))
+s_rw_models_reg4 <- read.csv(url(paste0(root,"/survey/chainedmodels_regi4.csv")))
+s_rw_models_reg5 <- read.csv(url(paste0(root,"/survey/chainedmodels_regi5.csv")))
+
+schainedR <- rbind(s_rw_models_reg1, s_rw_models_reg2, s_rw_models_reg3,
+                         s_rw_models_reg4, s_rw_models_reg5) %>%
+                     select(-region) %>%
+                     rename(region=regname)
+
+schainedR2 <- schainedR %>%
+         filter(align=="mean") %>%
+         mutate(cum_change.a=index2-1, win_years=length/4) %>%
+         select(-index2, -change.q, -ratio_change.q, -align, -pos, -length, -source) %>%
+         rename(Annual=change.a,Cumulative=cum_change.a) %>%
+   gather(type,val,-c(period,win_years,region))
+
+socc_sum2 <- read.csv(url(paste0(root,"/survey/occurance_summary_region.csv")))
+
+socc_sum3 <- socc_sum2 %>%
+               select(-region) %>%
+                     rename(region=regname) %>%
+            mutate(decade=substr(win_start,1,3),
+                   decade=ifelse(decade==199,"1990s",ifelse(decade==200,"2000s","2010s")),
+                   win_years=round(win_days/365),
+                   type="Observations") %>%
+            rename(period=win_end, val=Ave_obs_q) %>%
+            select(type,val,period,win_years,region)
+
+chainedR3 <- rbind(schainedR2,occ_sum3)
+
+#Control order of groups
+chainedR3$region <- factor(chainedR3$region, levels=c("Auckland",
+                                                              "Wellington",
+                                                              "Rest of \nNorth Island",
+                                                              "Canterbury",
+                                                              "Rest of \nSouth Island"))
+
+changePlot_r2 <- ggplot(schainedR2)+
+   geom_line(aes(as.yearqtr(period),val*100,colour=win_years, group=win_years), size=.5)+
+   geom_line(data=subset(schainedR2, win_years==8),
+             aes(as.yearqtr(period),val*100,linetype=as.factor(win_years)), size=.5, colour=pal1[5])+
+   geom_point(data=socc_sum3, aes(as.yearqtr(period),val,alpha=win_years), size=.5, stroke=1, fill="white")+
+   geom_point(data=subset(socc_sum3, win_years==8), aes(as.yearqtr(period),val), size=.8, fill=pal1[5], colour="#51ae32")+
+   facet_grid(type~region, scales="free", labeller = labeller(region = label_wrap_gen(20)))+
+   theme_ab()+
+   scale_colour_continuous(low=pal1[1],high=pal1[4],
+                           breaks=c(1,4,8,12,15),
+                           name="Model of \nwindow \nlength \n(years) \n")+
+   scale_linetype_discrete(name="Proposed \nlength \n(years)")+
+   scale_alpha_continuous(name="Window \nlength \n(years)",
+                          guide=guide_legend(direction="vertical"),
+                          breaks=c(5,15,25))+
+   labs(title="Impact of data window length, by region \n",
+        subtitle="Survey data, \n \npercent change compared with average price-change observations per property",
+        y="",
+        x="",
+        caption="Source: Stats NZ")+
+   theme(legend.position="bottom", axis.text.x = element_text(angle = 90))
+changePlot_r2
+
+```
+
+
+# References
+
+Aizcorbe, A., Corrado, C. & Doms, M. (2003). [When Do Matched-Model and Hedonic Techniques Yield Similar Price Measures?](https://dx.doi.org/10.2139/ssrn.550421) Working Paper no. 2003-14, Federal Reserve Bank of San Francisco. 
+
+Australian Bureau of Statistics (2017). [An Implementation Plan to Maximise the Use of Transactions Data in the CPI.](http://www.abs.gov.au/ausstats/abs@.nsf/Latestproducts/6401.0.60.004Main%20Features102017?opendocument&tabname=Summary&prodno=6401.0.60.004&issue=2017&num=&view=) Information Paper 6401.0.60.004, June 16, Canberra: ABS.
+
+Australian Bureau of Statistics (2016). [Making Greater Use of Transactions Data to Compile the Consumer Price Index.](http://www.abs.gov.au/ausstats/abs@.nsf/Latestproducts/6401.0.60.003Main%20Features22016?opendocument&tabname=Summary&prodno=6401.0.60.003&issue=2016&num=&view=) Information Paper 6401.0.60.003, November 29, Canberra: ABS.
+
+Bentley, A. & Krsinich, F. (2017). [Towards a big data CPI for New Zealand.](https://www.bundesbank.de/Redaktion/EN/Downloads/Bundesbank/Research_Centre/Conferences/2017/2017_05_10_ottawa_group_06_2_paper.html?__blob=publicationFile) Paper presented at the Ottawa Group 2017, Eltville, Germany.
+
+Bentley, A. (2016). [Household-group inflation: methods to combine expenditure patterns.](https://www.unece.org/fileadmin/DAM/stats/documents/ece/ces/ge.22/2016/Session_3_New_Zealand__household-group_inflation.pdf) Paper presented at the Meeting of the Group of Experts on Consumer Price Indices, Geneva, Switzerland, 2 - 4 May 2016
+
+Chessa, A. G. (2016). [A New Methodology for Processing Scanner Data in the Dutch CPI.](https://ec.europa.eu/eurostat/cros/system/files/euronaissue1-2016-art2.pdf) Eurona 1, 49-69.
+
+de Haan, J (2015). [A Framework for Large Scale Use of Scanner Data in the Dutch CPI.](http://www.stat.go.jp/english/info/meetings/og2015/pdf/t6s11p33_pap.pdf) 
+
+de Haan, J. & Krsinich, F (2014). [Scanner Data and the Treatment of Quality Change in Nonrevisable Price Indexes.](http://www.tandfonline.com/doi/abs/10.1080/07350015.2014.880059?journalCode=ubes20) Journal of Business & Economic Statistics, 32:3, 341-358
+
+Diewert, W. E. & Fox, K. J. (2017). [Substitution Bias in Multilateral Methods for CPI Construction using Scanner Data](https://irs.princeton.edu/sites/irs/files/Diewert%20and%20Fox%20Substitution%20Bias%20and%20MultilateralMethodsForCPI_DP17-02_March23.pdf) Discussion Paper 17-02, University of British Columbia, Vancouver, Canada.
+
+Diewert, W. E. (2004). [On the Stochastic Approach to Linking the Regions in the ICP.](http://papers.economics.ubc.ca/legacypapers/dp0416.pdf) Discussion Paper no. 04-16, Department of Economics, University of British Columbia, Vancouver, Canada
+
+Eurostat, EU, ILO, IMF, OECD, UNECE & The World Bank (2013). [Handbook on Residential Property Prices Indices (RPPIs).](http://ec.europa.eu/eurostat/documents/3859598/5925925/KS-RA-12-022-EN.PDF) Luxembourg, European Union
+
+ILO, IMF, OECD, UNECE, Eurostat & The World Bank (2004). [Consumer price index manual: Theory and practice](http://www.ilo.org/wcmsp5/groups/public/---dgreports/---stat/documents/presentation/wcms_331153.pdf) Geneva, International Labour Office, 2004
+
+Ivancic, L., W.E. Diewert and K.J. Fox (2009), [Scanner Data, Time Aggregation and the Construction of Price Indexes.](https://www.economics.ubc.ca/files/2013/06/pdf_paper_erwin-diewert-09-9-scanner-data.pdf) Discussion Paper 09-09, Department of Economics, University of British Columbia, Vancouver, Canada.
+
+Johnson, P. (2015) [UK Consumer Price Statistics: A Review.](https://www.statisticsauthority.gov.uk/archive/reports---correspondence/current-reviews/uk-consumer-price-statistics---a-review.pdf) January 2015, UK Statistics Authority.
+
+Krsinich, F. (2016). [The FEWS Index: Fixed Effects with a Window Splice.](https://doi.org/10.1515/jos-2016-0021) Journal of Official Statistics, Volume 32, Issue 2, Pages 375-404, ISSN (Online) 2001-7367.
+
+Krsinich, F. (2009). [Using Hedonic Regression to Assess the Housing Rentals Component of the New Zealand Consumers Price Index.](https://www.nzae.org.nz/wp-content/uploads/2011/08/Using_Hedonic_Regression_to_Assess_the_Housing_Rentals_Component_of_the_New_Zealand_Consumers_Price_Index.pdf). Paper presented at New Zealand Association of Economists 50th Anniversary conference, Wellington, New Zealand, 1 - 3 July 2009
+
+Miller, S., Suie, S. and Bycroft, C. (2018). [Comparing housing information from census and tenancy bond data.](https://www.stats.govt.nz/assets/Uploads/Reports/Comparing-housing-information-from-census-and-tenancy-bond-data/comparing-housing-information-from-census-and-tenancy-bond-data.pdf) March 2018, Stats NZ.
+
+Ministry of Business, Innovation and Employment (2018). [Rental bond data.](http://www.mbie.govt.nz/info-services/housing-property/sector-information-and-statistics/rental-bond-data) March 2018, MBIE.
+
+Silver, M. (2016). [How to Better Measure Hedonic Residential Property Price Indexes.](http://www.imf.org/en/Publications/WP/Issues/2016/12/31/How-to-Better-Measure-Hedonic-Residential-Property-Price-Indexes-44382) IMF working paper 16/213. 
+
+Stats NZ (2015). [IDI Data Dictionary: Tenancy bond data.](http://archive.stats.govt.nz/browse_for_stats/snapshots-of-nz/integrated-data-infrastructure/idi-data/tenancy-bond-data.aspx) (July 2015 edition).
+
+Stats NZ (2008). [Rented dwellings in the CPI.](http://archive.stats.govt.nz/browse_for_stats/economic_indicators/CPI_inflation/rented-dwellings-in-the-cpi.aspx) Price Index News, April 2008.
+
+Summers, R (1973). [International Comparisons Based Upon Incomplete Data.](http://onlinelibrary.wiley.com/doi/10.1111/j.1475-4991.1973.tb00870.x/full) Review of Income and Wealth, 19: 1-16.
+
+White, G. (2018). [IndexNumR: A Package for Index Number Calculation.](https://cran.r-project.org/web/packages/IndexNumR/vignettes/indexnumr.html) Comprehensive R Archive Network, R Foundation for Statistical Computing.
