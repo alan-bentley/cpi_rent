@@ -692,7 +692,7 @@ chained3 <- chained2 %>%
           cum_change.a=index2000-1)
 
 #10.5 Read the stock admin model
-stockmod <- read.csv(url(paste0(root, "/admin/stock_mod_sim3.csv")))
+stockmod <- read.csv(url(paste0(root, "/admin/stock_mod_sim4.csv")))
 
 #10.6 Tidy up the stock model data
 stock_chained <- stockmod %>%
@@ -1148,7 +1148,7 @@ chained3 <- chained2 %>%
           datasource = "administrative - flow",
           cum_change.a=index2000-1)
 
-stockmod <- read.csv(url(paste0(root, "/admin/stock_mod_sim3.csv")))
+stockmod <- read.csv(url(paste0(root, "/admin/stock_mod_sim4.csv")))
 
 stock_chained <- stockmod %>%
    filter(index_type=="index_revisable" & imp_length %in% c(1,2,3,4,5)) %>%
