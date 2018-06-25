@@ -16,76 +16,81 @@ library(ggplot2)
 library(scales)
 library(tibble)
 
+#0. Set root path
+
+root <- "//wd.govt.nz/dfs/SharedData/Wellington/Bowen Street/R&N/Networks/Housing Information & Modelling/housing_reporting/cpi_rent"
+
 #1. Data prep
 
-#1.1 Load the data
-root_dir <- "//wd.govt.nz/dfs/SharedData/Wellington/Bowen Street/R&N/Networks/Housing Information & Modelling/housing_projects/cpi_rent/"
+load(file = paste0(root, "/data_intermediate/house.rda"))
 
-load(file = paste0(root_dir, "/data_intermediate/house_long.rda"))
-
-#1.2 Keep the variables needed
-mod_data <- select(house, Rent, quarter, quarter_f, PropertyID, Property, TA,SAU, Bedrooms, Property_Type, Date.Lodged, Date.Closed, Private_Bond) %>%
-   filter(Property_Type !="UNK" & SAU !=-1 & Bedrooms !="unknown") %>%
-   mutate(date = as.Date(quarter),
-          month = format(as.Date(Date.Lodged),"%Y-%m"),
-          month_f = as.factor(month))
+house <- house %>%
+   select(-c(ID, Date.VestedtoCrown, quarter, Bond.Amount))
 
 #####
 
 #1.3.1 Take a sample of Properties (to test the code faster)
 set.seed(67)
-propsamp <- as.character(sample(unique(mod_data$PropertyID), 200000))
+propsamp <- as.character(sample(unique(house$PropertyID), 20000))
 
-mod_data <- mod_data %>%
+house_closed <- house %>%
    filter(PropertyID %in% propsamp) %>%
    mutate(PropertyID=as.factor(as.character(PropertyID))) %>%
-   arrange(Date.Lodged)
+   arrange(Date.Lodged) %>%
+   filter(!is.na(Date.Closed))
+
+house_notclosed <- house %>%
+   filter(PropertyID %in% propsamp) %>%
+   mutate(PropertyID=as.factor(as.character(PropertyID))) %>%
+   arrange(Date.Lodged) %>%
+   filter(is.na(Date.Closed)) %>%
+   mutate(Date.Closed=as.Date("9999-01-01","%Y-%m-%d")) #Set unknown closed date
+
+house <- rbind(house_closed,house_notclosed)
 
 #1.4.1 Add all time periods
-quarters <- unique(mod_data$quarter_f) #list of unique quarters
+quarters <- unique(house$quarter_f) #list of unique quarters
 quarter <- data.frame(quarters) %>%
    mutate(quarter_f=as.factor(quarters)) %>%
    select(-quarters)
 
 #1.5.1 Carry forward opening bonds, unless closed
-mod_data_imp <- c()
+house_stock <- c()
 
-for (p in levels(mod_data$PropertyID)) {
+for (p in levels(house$PropertyID)) {
    
-   property_imp <- mod_data %>%
-      select(-c(date,month,month_f,quarter)) %>%
+   property_imp <- house %>%
       filter(PropertyID %in% p) %>%
       right_join(quarter,by="quarter_f") %>%
       mutate(q_closed=as.yearqtr(Date.Closed)) %>%
-      na.locf() %>% #Zoo::Last Observation Carried Forward
-      filter (as.yearqtr(quarter_f) <= q_closed #Not closed
-              | !is.na(Date.Lodged) & is.na(q_closed)) #Lodged but unknown closed data (could be a future date)
+      na.locf() #Zoo::Last Observation Carried Forward
+   # filter  (as.Date(Date.Lodged) >= as.Date(as.yearqtr(quarter_f))-(365.25*2)) #Cut off imputation after 2 years
    
-   mod_data_imp <- rbind(mod_data_imp,property_imp)
+   house_stock <- rbind(house_stock,property_imp)
 }
 
-mod_data_imp2 <- mod_data_imp %>%
+house_stock <- house_stock %>%
    mutate(Rent=as.numeric(Rent),
           quarter=as.yearqtr(quarter_f),
           quarter_f=as.factor(quarter_f),
           PropertyID=as.factor(PropertyID),
           Property=as.numeric(Property),
           TA=as.factor(TA),
-          SAU=as.factor(SAU),
+          SAU=as.integer(SAU),
           Bedrooms=as.factor(Bedrooms),
           Property_Type=as.factor(Property_Type),
           wi=Rent/sum(Rent),
           date = as.Date(quarter)) %>%
    select(-c(Date.Closed,q_closed))
 
-save(mod_data_imp2, file = paste0(root_dir, "data_intermediate/house_stock.rda"))
+mod_data <- select(house_stock, Rent, quarter, quarter_f, PropertyID, Property, TA,SAU, Bedrooms, Property_Type, Date.Lodged, Private_Bond) %>%
+   filter(Property_Type !="UNK" & SAU !=-1 & Bedrooms !="unknown") %>%
+   mutate(date = as.Date(quarter))
 
-mod_data <- mod_data_imp2
-
-#1.6 Add weights to bond data
+#1.2 Add weights to bond data
 mod_data2 <- mod_data %>%
-            group_by(quarter) %>%
-            mutate(wi=Rent/sum(Rent)) #expenditure share, by quarter
+   group_by(quarter) %>%
+   mutate(wi=Rent/sum(Rent)) #expenditure share, by quarter
 
 #2. Create the model function 
 
@@ -323,7 +328,7 @@ RW_MLM <- function (data, lenwin) {
 
 rw_models_stock_sim <- c()
 
-for (imp in c(1,1.25,1.5,1.75,2,2.25,2.5,2.75,3,4,5,6,7,8,9,10,15,20)) {
+for (imp in c(1,2,3,4,5)) {
    for (lenwin in 32) {
       #Run model for region
       MWM_reg <- mod_data %>%
@@ -336,4 +341,11 @@ for (imp in c(1,1.25,1.5,1.75,2,2.25,2.5,2.75,3,4,5,6,7,8,9,10,15,20)) {
       rw_models_stock_sim <- rbind(rw_models_stock_sim, MWM_reg)
    }}
 
-write.csv(rw_models_stock_sim,paste0(root_dir, "/data_intermediate/stock_mod_sim3.csv"), row.names=FALSE)
+root_dir <- "//wd.govt.nz/dfs/SharedData/Wellington/Bowen Street/R&N/Networks/Housing Information & Modelling/housing_projects/cpi_rent/"
+
+write.csv(rw_models_stock_sim,paste0(root_dir, "/data_intermediate/stock_mod_sim3b.csv"), row.names=FALSE)
+
+rw_models_stock_sim2 <- rw_models_stock_sim %>%
+   filter(as.yearqtr(period)<="2017 Q4")
+
+write.csv(rw_models_stock_sim2,paste0(root_dir, "/data_intermediate/stock_mod_sim4.csv"), row.names=FALSE)
