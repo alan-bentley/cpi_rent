@@ -1,0 +1,1 @@
+Geometric mean of weekly rental amount for survey and stock-modelled admin data.
